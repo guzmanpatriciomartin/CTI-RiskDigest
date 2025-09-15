@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suite de Tickets de Riesgos y Ciberseguridad</title>
+    <!-- Librerías Externas para PDF y Gráficos -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #1a1a2e; --header-bg: #16213e; --primary-card-bg: #1f2847;
+            --secondary-card-bg: #2a3459; --border-color: #3a476f; --text-primary: #e0e6f9;
+            --text-secondary: #a8b2d1; --accent-color: #00f5c3; --accent-hover: #52fadd;
+            --tag-bg: #314a52; --tag-text: #b1e0ec; --priority-high: #e94560;
+            --priority-medium: #f8b400; --priority-low: #25d366; --danger-color: #e94560;
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-primary); margin: 0; line-height: 1.6; }
+        header { background-color: var(--header-bg); padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 900; }
+        .action-button { background-color: var(--accent-color); color: var(--bg-color); font-weight: bold; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; }
+        main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+        .card { background-color: var(--primary-card-bg); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--border-color); }
+        h1, h2, h3, h4 { color: var(--text-primary); margin:0; }
+        h1 {font-size: 1.5em;}
+        h2 { font-size: 1.4em; color: var(--accent-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom:1.5rem; }
+        h3 { font-size: 1.2em; border:none; margin-bottom:1rem; }
+        h4 { font-size: 1.1em; color:var(--text-secondary); margin-top:1.5rem; margin-bottom:1rem; }
+
+        /* DASHBOARD */
+        #dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
+        .stat-card { background-color: var(--secondary-card-bg); padding: 1rem; border-radius: 8px; text-align: center; }
+        .stat-card-value { font-size: 2.5em; font-weight: bold; color: var(--accent-color); }
+        
+        /* MODAL */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); }
+        .modal.is-active { display: flex; justify-content: center; align-items: center; }
+        .modal-content { background-color: var(--primary-card-bg); margin: auto; padding: 2rem; border: 1px solid var(--border-color); border-radius: 12px; width: 90%; max-width: 700px; position: relative; }
+        .modal-close { position: absolute; top: 1rem; right: 1.5rem; color: var(--text-secondary); font-size: 2em; font-weight: bold; cursor: pointer; }
+
+        /* FORMULARIOS Y FILTROS */
+        .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+        input, textarea, select { width: 100%; padding: 0.8rem; border: 1px solid var(--border-color); border-radius: 4px; font-size: 1rem; background-color: var(--secondary-card-bg); color: var(--text-primary); }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
+        .filter-buttons { margin-top: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .filter-buttons button { background-color: var(--secondary-card-bg); border: 1px solid var(--border-color); padding: 0.5rem 1rem; cursor: pointer; border-radius: 6px; }
+        .filter-buttons button.active { background-color: var(--accent-color); color: var(--bg-color); }
+        
+        /* TICKETS - USANDO DETAILS/SUMMARY */
+        .ticket-item { padding: 0; border: 1px solid var(--border-color); border-left: 5px solid; border-radius: 8px; overflow: hidden; margin-bottom: 1rem; }
+        .ticket-summary { padding: 1.5rem; display: block; cursor: pointer; transition: background-color 0.2s; }
+        .ticket-summary::-webkit-details-marker { display: none; }
+        .ticket-item[open] > .ticket-summary { background-color: var(--secondary-card-bg); border-bottom: 1px solid var(--border-color); }
+        .ticket-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+        .ticket-header h3 { border: none; padding: 0; }
+        .tags-container { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+        .tag { padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85em; }
+        .tag.interactive:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,245,195,0.2); cursor: pointer;}
+        .customer-tag { background-color: var(--secondary-card-bg); color: var(--text-secondary); }
+        .keyword-tag { background-color: var(--tag-bg); color: var(--tag-text); }
+        .ticket-details { padding: 0 1.5rem 1.5rem 1.5rem; }
+        
+        /* TIMELINE VISUALIZATION */
+        .timeline-container { position: relative; padding-left: 25px; margin-top: 1rem; }
+        .timeline-container::before { content: ''; position: absolute; left: 8px; top: 10px; bottom: 10px; width: 2px; background-color: var(--border-color); }
+        .timeline-event { position: relative; margin-bottom: 1.5rem; padding-left: 20px; }
+        .timeline-event::before { content: ''; position: absolute; left: 0; top: 5px; width: 18px; height: 18px; border-radius: 50%; background-color: var(--bg-color); border: 3px solid var(--border-color); }
+        .timeline-event.event-status_change::before { border-color: var(--accent-color); }
+        .timeline-event.event-comment::before { border-color: var(--priority-medium); }
+        .timeline-event-content .meta { font-size: 0.85em; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .timeline-event-content .description { background-color: var(--secondary-card-bg); padding: 0.8rem 1rem; border-radius: 8px; border-left: 3px solid var(--border-color); }
+        .timeline-event.event-status_change .description { border-left-color: var(--accent-color); }
+        .timeline-event.event-comment .description { border-left-color: var(--priority-medium); }
+        .timeline-event-content p { margin: 0.5rem 0; }
+
+        .comment-form { display: flex; gap: 1rem; margin-top: 1.5rem; border-top: 1px dashed var(--border-color); padding-top: 1.5rem; }
+        .actions-grid { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: flex-end; }
+
+        /* Estilos para el Digest de Noticias - Sección general */
+        #cybersecurity-digest-section {
+            background-color: var(--primary-card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+        #digest-items-container { /* Nuevo ID para el contenedor de items */
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: var(--secondary-card-bg);
+            border-radius: 8px;
+            border: 1px dashed var(--border-color);
+            max-height: 80vh;
+            overflow-y: auto;
+            color: var(--text-primary);
+            display: grid; /* Para organizar las tarjetas de noticias */
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        /* Estilos específicos de las tarjetas de noticias dentro del digest */
+        .news-card {
+            background-color: var(--primary-card-bg);
+            border: 1px solid var(--border-color);
+            border-left: 5px solid var(--accent-color);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* Empuja el botón al final */
+        }
+        .news-card h3 {
+            color: var(--text-primary);
+            font-size: 1.2em;
+            margin-bottom: 0.5rem;
+            border: none; /* Sobrescribe el estilo h3 global */
+        }
+        .news-card h3 a {
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+        .news-card h3 a:hover {
+            color: var(--accent-hover);
+            text-decoration: underline;
+        }
+        .news-card .news-meta {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+        .news-card .news-brief {
+            font-size: 0.9em;
+            line-height: 1.5;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            flex-grow: 1; /* Permite que el brief ocupe el espacio disponible */
+        }
+        .news-card .news-brief.error {
+            color: var(--danger-color);
+            font-weight: bold;
+        }
+        .news-card .create-ticket-from-digest-btn {
+            background-color: var(--priority-low); /* Verde para crear ticket */
+            color: var(--bg-color);
+            font-weight: bold;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 1rem;
+            width: 100%; /* El botón ocupa todo el ancho */
+        }
+        .news-card .create-ticket-from-digest-btn:hover {
+            background-color: #3ee07f; /* Tono más claro al pasar el ratón */
+        }
+        .no-articles {
+            grid-column: 1 / -1; /* Centra el mensaje en el grid */
+            text-align: center;
+            color: var(--text-secondary);
+            margin-top: 20px;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <header><h1>Dashboard de Riesgos</h1><button id="open-modal-btn" class="action-button">Crear Nuevo Ticket</button></header>
+    <main>
+        <section class="card">
+            <h2>Vista General de Operaciones</h2>
+            <div id="dashboard-grid"></div>
+        </section>
+
+        <section class="card">
+             <h2>Filtros y Reportes</h2>
+             <div class="form-grid">
+                <div class="form-group"> <label for="searchInput">Búsqueda General</label> <input type="search" id="searchInput" placeholder="Buscar en título, ID, comentarios..."> </div>
+                <div class="form-group"> <label for="clientFilter">Filtrar por Cliente</label> <select id="clientFilter"><option value="">Todos</option></select> </div>
+                <div class="form-group"> <label for="tagFilter">Filtrar por Tag</label> <select id="tagFilter"><option value="">Todos</option></select> </div>
+             </div>
+             <div class="filter-buttons"></div>
+             <div style="margin-top:1.5rem; border-top: 1px solid var(--border-color); padding-top:1.5rem;">
+                <h3 style="border:none; margin-bottom:1rem;">Exportar a PDF</h3>
+                <div class="form-grid" style="align-items:flex-end;">
+                    <div class="form-group"> <label for="startDate">Fecha de Inicio</label> <input type="date" id="startDate"> </div>
+                    <div class="form-group"> <label for="endDate">Fecha de Fin</label> <input type="date" id="endDate"> </div>
+                    <button id="export-pdf-btn" class="action-button" style="background-color:var(--priority-low)">Exportar Vista a PDF</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Nueva sección para el Digest de Noticias de Ciberseguridad -->
+        <section id="cybersecurity-digest-section" class="card">
+            <h2>Digest de Noticias de Ciberseguridad</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="digestDaysInput">Buscar noticias de los últimos (días)</label>
+                    <input type="number" id="digestDaysInput" value="7" min="1" max="30">
+                </div>
+                <button id="generate-digest-btn" class="action-button" style="background-color:var(--accent-color)">Generar Digest</button>
+            </div>
+            <div id="digest-items-container">
+                <p class="no-articles">Haz clic en "Generar Digest" para obtener las últimas noticias de ciberseguridad.</p>
+            </div>
+        </section>
+
+        <div id="ticketList"></div>
+    </main>
+
+    <!-- MODAL DE CREACIÓN -->
+    <div id="add-ticket-modal" class="modal">
+        <div class="modal-content">
+            <span id="close-modal-btn" class="modal-close">&times;</span>
+            <section>
+                <h2>Crear Nuevo Ticket</h2>
+                <form id="newTicketForm">
+                    <div class="form-grid">
+                        <div class="form-group full-width"><label for="ticketTitle">Título del Riesgo</label><input type="text" id="ticketTitle" required></div>
+                        <div class="form-group"><label for="customerNames">Clientes (separados por coma)</label><input type="text" id="customerNames" required></div>
+                        <div class="form-group"><label for="ticketTags">Tags (separados por coma)</label><input type="text" id="ticketTags" required></div>
+                        <div class="form-group full-width"><label for="ticketPriority">Prioridad</label><select id="ticketPriority" required><option value="" disabled selected>-- Seleccionar --</option><option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option></select></div>
+                        <div class="form-group full-width"><label for="ticketDescription">Descripción Detallada</label><textarea id="ticketDescription" rows="4" required></textarea></div>
+                    </div>
+                    <button type="submit" class="action-button" style="width:100%; margin-top:1rem;">Guardar Ticket</button>
+                </form>
+            </section>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // SELECTORES DEL DOM
+        const DOM = {
+            ticketList: document.getElementById('ticketList'), modal: document.getElementById('add-ticket-modal'),
+            openModalBtn: document.getElementById('open-modal-btn'), closeModalBtn: document.getElementById('close-modal-btn'),
+            newTicketForm: document.getElementById('newTicketForm'), searchInput: document.getElementById('searchInput'),
+            statusFilterContainer: document.querySelector('.filter-buttons'), clientFilter: document.getElementById('clientFilter'),
+            tagFilter: document.getElementById('tagFilter'), exportBtn: document.getElementById('export-pdf-btn'),
+            dashboardGrid: document.getElementById('dashboard-grid')
+        };
+        const STATUSES = ['todos', 'detectado', 'notificado', 'mitigando', 'resuelto', 'riesgo-aceptado'];
+        let filters = { status: 'todos', search: '', client: '', tag: '' };
+
+        // FUNCIONES DE DATOS
+        const getTickets = () => JSON.parse(localStorage.getItem('tickets_v8')) || [];
+        const saveTickets = (tickets) => { localStorage.setItem('tickets_v8', JSON.stringify(tickets)); };
+        const parseCSV = str => str ? str.split(',').map(item => item.trim()).filter(Boolean) : [];
+
+        // LÓGICA DE MODAL
+        const openModal = () => DOM.modal.classList.add('is-active');
+        const closeModal = () => DOM.modal.classList.remove('is-active');
+
+        // LÓGICA DE ACTUALIZACIÓN DE UI
+        const updateDashboard = () => {
+            const tickets = getTickets();
+            const counts = tickets.reduce((acc, t) => ({...acc, [t.status]: (acc[t.status] || 0) + 1}), {});
+            const openCount = tickets.filter(t => !['resuelto', 'riesgo-aceptado'].includes(t.status)).length;
+            DOM.dashboardGrid.innerHTML = `
+                <div class="stat-card"><div class="stat-card-value">${tickets.length}</div><div class="stat-card-label">Total Tickets</div></div>
+                <div class="stat-card"><div class="stat-card-value">${openCount}</div><div class="stat-card-label">Abiertos</div></div>
+                ${STATUSES.slice(1).map(s => `<div class="stat-card"><div class="stat-card-value">${counts[s]||0}</div><div class="stat-card-label" style="text-transform:capitalize;">${s.replace('-',' ')}</div></div>`).join('')}`;
+        };
+        
+        const populateFilters = () => {
+            const tickets = getTickets();
+            const allClients = new Set(tickets.flatMap(t => t.customers));
+            const allTags = new Set(tickets.flatMap(t => t.tags));
+            const populateSelect = (select, items, selected) => {
+                select.innerHTML = `<option value="">Todos</option>`;
+                [...items].sort().forEach(item => { select.innerHTML += `<option value="${item}" ${item === selected ? 'selected' : ''}>${item}</option>`; });
+            };
+            populateSelect(DOM.clientFilter, allClients, filters.client);
+            populateSelect(DOM.tagFilter, allTags, filters.tag);
+            DOM.statusFilterContainer.innerHTML = STATUSES.map(s => `<button data-filter="${s}" class="${filters.status === s ? 'active' : ''}" style="text-transform:capitalize;">${s.replace('-',' ')}</button>`).join('');
+        };
+
+        const renderTickets = () => {
+            let tickets = getTickets();
+            const filtered = tickets.filter(t => {
+                const activityText = t.activity.map(log => log.type === 'comment' ? log.text : log.comment).join(' ');
+                const searchableContent = (t.title + t.description + t.id + activityText).toLowerCase();
+                const searchTerm = filters.search.toLowerCase();
+                return (filters.status === 'todos' || t.status === filters.status) && (!filters.client || t.customers.includes(filters.client)) && (!filters.tag || t.tags.includes(filters.tag)) && (!filters.search || searchableContent.includes(searchTerm));
+            });
+            DOM.ticketList.innerHTML = filtered.length === 0 ? '<div class="card"><p style="text-align:center;color:var(--text-secondary)">No se encontraron tickets con los criterios actuales.</p></div>' : '';
+            filtered.forEach(ticket => {
+                const ticketElement = document.createElement('details');
+                ticketElement.className = 'ticket-item';
+                ticketElement.style.borderLeftColor = `var(--priority-${ticket.priority})`;
+                const activityHtml = ticket.activity.sort((a,b) => a.timestamp - b.timestamp).map(log => {
+                    const time = new Date(log.timestamp).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short'});
+                    let descriptionHtml = '';
+                    if (log.type === 'comment') {
+                        descriptionHtml = `<p>${log.text}</p>`;
+                    } else {
+                        descriptionHtml = `<p>Estado cambiado a <strong>${log.status.replace('-',' ')}</strong>.</p><p><em>"${log.comment}"</em></p>`;
+                    }
+                    return `<div class="timeline-event event-${log.type}"><div class="timeline-event-content"><div class="meta">${log.type === 'comment' ? 'Comentario' : 'Cambio de estado'} - ${time}</div><div class="description">${descriptionHtml}</div></div></div>`;
+                }).join('');
+                ticketElement.innerHTML = `<summary class="ticket-summary"><div class="ticket-header"><div><h3>${ticket.title}</h3><span style="font-size:0.9em;color:var(--text-secondary)">#${ticket.id}</span></div><span style="background-color: var(--priority-${ticket.priority}); color: #1a1a2e; padding: 0.2rem 0.6rem; border-radius:1rem; font-size:0.8em; font-weight:bold;text-transform:capitalize;">${ticket.priority}</span></div><div class="tags-container">${ticket.customers.map(c => `<span class="tag customer-tag interactive" data-type="client" data-value="${c}">${c}</span>`).join('')}${ticket.tags.map(t => `<span class="tag keyword-tag interactive" data-type="tag" data-value="${t}">${t}</span>`).join('')}</div></summary><div class="ticket-details"><h4>Descripción</h4><p>${ticket.description}</p><h4>Acciones</h4><div class="actions-grid"><div class="form-group"><label for="status-${ticket.id}">Cambiar Estado del Ticket</label><select id="status-${ticket.id}" class="status-selector" data-ticket-id="${ticket.id}">${STATUSES.slice(1).map(s=>`<option value="${s}" ${ticket.status===s?'selected':''}>${s.replace('-',' ')}</option>`).join('')}</select></div><button class="action-button delete-btn" data-ticket-id="${ticket.id}" style="background-color:var(--danger-color)">Eliminar</button></div><h4>Historial del Ticket</h4><div class="timeline-container">${activityHtml}</div><form class="comment-form" data-ticket-id="${ticket.id}"><textarea placeholder="Añadir un comentario..." required rows="2"></textarea><button type="submit" class="action-button">Enviar</button></form></div>`;
+                DOM.ticketList.appendChild(ticketElement);
+            });
+        };
+        
+        const refreshUI = () => { populateFilters(); updateDashboard(); renderTickets(); };
+
+        // MANEJADORES DE EVENTOS DE TICKETS
+        DOM.openModalBtn.addEventListener('click', () => {
+            // Limpiar el formulario al abrir el modal para un nuevo ticket "desde cero"
+            DOM.newTicketForm.reset();
+            // Asegurarse de que el valor por defecto de prioridad es "-- Seleccionar --"
+            DOM.newTicketForm.querySelector('#ticketPriority').value = "";
+            openModal();
+        });
+        DOM.closeModalBtn.addEventListener('click', closeModal);
+        DOM.newTicketForm.addEventListener('submit', e => { e.preventDefault(); const now = Date.now(); const newTicket = { id: now, status: 'detectado', createdAt: now, lastUpdated: now, title: DOM.newTicketForm.querySelector('#ticketTitle').value, customers: parseCSV(DOM.newTicketForm.querySelector('#customerNames').value), tags: parseCSV(DOM.newTicketForm.querySelector('#ticketTags').value), priority: DOM.newTicketForm.querySelector('#ticketPriority').value, description: DOM.newTicketForm.querySelector('#ticketDescription').value, activity: [{ type: 'status_change', timestamp: now, status: 'detectado', comment: 'Ticket creado.' }] }; const tickets = getTickets(); tickets.unshift(newTicket); saveTickets(tickets); DOM.newTicketForm.reset(); closeModal(); refreshUI(); });
+        DOM.searchInput.addEventListener('input', e => { filters.search = e.target.value; renderTickets(); });
+        DOM.clientFilter.addEventListener('change', e => { filters.client = e.target.value; renderTickets(); });
+        DOM.tagFilter.addEventListener('change', e => { filters.tag = e.target.value; renderTickets(); });
+        DOM.statusFilterContainer.addEventListener('click', e => { if (e.target.tagName === 'BUTTON') { filters.status = e.target.dataset.filter; refreshUI(); } });
+        DOM.ticketList.addEventListener('click', e => { if (e.target.matches('.interactive')) { filters.search = ''; filters[e.target.dataset.type] = e.target.dataset.value; window.scrollTo({ top: 0, behavior: 'smooth' }); refreshUI(); } else if (e.target.matches('.delete-btn')) { const ticketId = e.target.dataset.ticketId; if (confirm('¿Seguro que quieres eliminar este ticket? Es irreversible.')) { saveTickets(getTickets().filter(t => t.id != ticketId)); refreshUI(); } } });
+        DOM.ticketList.addEventListener('submit', e => { if (e.target.matches('.comment-form')) { e.preventDefault(); const ticketId = e.target.dataset.ticketId; const commentText = e.target.querySelector('textarea').value; if (!commentText) return; let tickets = getTickets(); const ticket = tickets.find(t => t.id == ticketId); const now = Date.now(); ticket.activity.push({ type: 'comment', timestamp: now, text: commentText }); ticket.lastUpdated = now; saveTickets(tickets); refreshUI(); } });
+        DOM.ticketList.addEventListener('change', e => { if (e.target.matches('.status-selector')) { const ticketId = e.target.dataset.ticketId; const newStatus = e.target.value; let tickets = getTickets(); const ticket = tickets.find(t => t.id == ticketId); if (newStatus === ticket.status) return; const comment = prompt(`Añade una nota para el cambio de estado a "${newStatus}":`); if (comment !== null && comment.trim() !== "") { const now = Date.now(); ticket.status = newStatus; ticket.lastUpdated = now; ticket.activity.push({ type: 'status_change', timestamp: now, status: newStatus, comment: comment }); saveTickets(tickets); refreshUI(); } else { alert('Se requiere un comentario para cambiar el estado.'); e.target.value = ticket.status; } } });
+
+        // --- FUNCIÓN DE EXPORTACIÓN CON NUEVOS ESTILOS PROFESIONALES ---
+        DOM.exportBtn.addEventListener('click', async () => {
+            const btn = DOM.exportBtn;
+            btn.disabled = true;
+            btn.textContent = 'Generando...';
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const startDateStr = document.getElementById('startDate').value;
+                const endDateStr = document.getElementById('endDate').value;
+
+                if (!startDateStr || !endDateStr) { alert('Por favor, selecciona un rango de fechas válido.'); return; }
+                
+                const startDate = new Date(startDateStr); startDate.setUTCHours(0, 0, 0, 0);
+                const endDate = new Date(endDateStr); endDate.setUTCHours(23, 59, 59, 999);
+                
+                const tickets = getTickets().filter(t => {
+                    const activityText = t.activity.map(log => log.type === 'comment' ? log.text : log.comment).join(' ');
+                    const searchableContent = (t.title + t.description + t.id + activityText).toLowerCase();
+                    const searchTerm = filters.search.toLowerCase();
+                    const inDateRange = t.createdAt >= startDate.getTime() && t.createdAt <= endDate.getTime();
+                    const statusMatch = (filters.status === 'todos' || t.status === filters.status);
+                    const clientMatch = (!filters.client || t.customers.includes(filters.client));
+                    const tagMatch = (!filters.tag || t.tags.includes(filters.tag));
+                    const searchMatch = (!filters.search || searchableContent.includes(searchTerm));
+                    return inDateRange && statusMatch && clientMatch && tagMatch && searchMatch;
+                });
+
+                if (tickets.length === 0) {
+                    alert('No se encontraron tickets que coincidan con los filtros y el rango de fechas seleccionado.');
+                    return;
+                }
+
+                // --- ESTILOS Y CONFIGURACIÓN DEL PDF ---
+                const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+                const pageHeight = doc.internal.pageSize.height;
+                const pageWidth = doc.internal.pageSize.width;
+                const margin = 40;
+                let yPos = 0;
+
+                const COLOR_PRIMARY = '#16213E';
+                const COLOR_ACCENT = '#00F5C3';
+                const COLOR_WHITE = '#FFFFFF';
+                const COLOR_TEXT_DARK = '#333333';
+                const COLOR_TEXT_LIGHT = '#666666';
+                const COLOR_BACKGROUND = '#F8F9FA';
+
+                const FONT_H1 = 20; const FONT_H2 = 14; const FONT_H3 = 11;
+                const FONT_NORMAL = 10; const FONT_SMALL = 8;
+                
+                const autoTableStyles = { headStyles: { fillColor: COLOR_PRIMARY, textColor: COLOR_WHITE, fontSize: FONT_SMALL }, styles: { fontSize: FONT_SMALL, cellPadding: 5 } };
+                
+                // --- FUNCIONES HELPER PARA DIBUJAR EL PDF ---
+                const addPageFooter = () => {
+                    const pageCount = doc.internal.getNumberOfPages();
+                    for (let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i);
+                        doc.setFontSize(FONT_SMALL); doc.setTextColor(COLOR_TEXT_LIGHT);
+                        doc.text(`Reporte de Tickets de Riesgo`, margin, pageHeight - 20);
+                        doc.text(`Página ${i} de ${pageCount}`, pageWidth - margin, pageHeight - 20, { align: 'right' });
+                    }
+                };
+                const checkAndAddPage = (neededHeight) => { if (yPos + neededHeight > pageHeight - margin - 20) { doc.addPage(); yPos = margin; } };
+                const addSectionTitle = (title) => {
+                    checkAndAddPage(40);
+                    yPos += 20;
+                    doc.setFontSize(FONT_H2); doc.setFont('helvetica', 'bold'); doc.setTextColor(COLOR_PRIMARY);
+                    doc.text(title, margin, yPos);
+                    yPos += 15;
+                    doc.setDrawColor(COLOR_ACCENT); doc.setLineWidth(1.5);
+                    doc.line(margin, yPos, pageWidth - margin, yPos);
+                    yPos += 20;
+                };
+
+                // --- CÁLCULO DE KPIs ---
+                const formatMillisToDHMS = (millis) => { let d = Math.floor(millis / 86400000); let h = Math.floor((millis % 86400000) / 3600000); let m = Math.round(((millis % 86400000) % 3600000) / 60000); return `${d}d ${h}h ${m}m`; };
+                const resolvedTickets = tickets.filter(t => t.status === 'resuelto');
+                let totalResolutionTime = 0;
+                resolvedTickets.forEach(t => { const rEvent = t.activity.find(a => a.type === 'status_change' && a.status === 'resuelto'); if (rEvent) totalResolutionTime += (rEvent.timestamp - t.createdAt); });
+                const avgResolutionTimeMillis = resolvedTickets.length > 0 ? totalResolutionTime / resolvedTickets.length : 0;
+                const avgResolutionText = resolvedTickets.length > 0 ? formatMillisToDHMS(avgResolutionTimeMillis) : "No aplica (0 resueltos)";
+                const priorityCounts = tickets.reduce((acc, t) => ({ ...acc, [t.priority]: (acc[t.priority] || 0) + 1 }), {});
+                const mostAffectedCustomer = Object.entries(tickets.flatMap(t => t.customers).reduce((acc, c) => ({...acc, [c]:(acc[c]||0)+1}), {})).sort((a,b) => b[1]-a[1])[0]?.[0] || "N/A";
+
+                // --- GENERAR GRÁFICO ---
+                const statusCounts = tickets.reduce((acc, t) => ({...acc, [t.status]:(acc[t.status]||0)+1}), {});
+                const chartLabels = Object.keys(statusCounts);
+                const chartData = Object.values(statusCounts);
+                const statusColors = {'detectado':'#F8B400','notificado':'#3498DB','mitigando':'#E67E22','resuelto':'#25D366','riesgo-aceptado':'#95A5A6'};
+                const canvas = document.createElement('canvas');
+                canvas.width = 400; canvas.height = 400;
+                new Chart(canvas.getContext('2d'), {type:'pie',data:{labels:chartLabels.map(l=>l.replace('-',' ')),datasets:[{data:chartData,backgroundColor:chartLabels.map(l=>statusColors[l]||'#bdc3c7')}]},options:{responsive:false,animation:false,plugins:{legend:{position:'right'}}}});
+                const chartImage = canvas.toDataURL('image/png', 1.0);
+
+                // --- CONSTRUCCIÓN DEL DOCUMENTO ---
+                // Portada
+                doc.setFillColor(COLOR_PRIMARY); doc.rect(0, 0, pageWidth, pageHeight, 'F');
+                doc.setFontSize(32); doc.setFont('helvetica', 'bold'); doc.setTextColor(COLOR_WHITE);
+                doc.text('Reporte de Tickets de Riesgo', pageWidth/2, pageHeight/2 - 40, {align:'center'});
+                doc.setFontSize(16); doc.setFont('helvetica', 'normal');
+                doc.text(`Período: ${startDate.toLocaleDateString('es-ES')} al ${endDate.toLocaleDateString('es-ES')}`, pageWidth/2, pageHeight/2, {align:'center'});
+                const filtersText = Object.entries(filters).filter(([,v])=>v&&v!=='todos').map(([k,v])=>`${k.charAt(0).toUpperCase()+k.slice(1)}: ${v}`).join(' | ');
+                if (filtersText) doc.text(`Filtros: ${filtersText}`, pageWidth/2, pageHeight/2 + 30, {align:'center'});
+
+                doc.addPage();
+                yPos = margin;
+
+                // Sección KPIs
+                addSectionTitle('Dashboard Resumen');
+                const kpiMetrics = [
+                    { label: 'Tickets Encontrados', value: tickets.length },
+                    { label: 'Tickets Abiertos', value: tickets.length - ((statusCounts.resuelto || 0) + (statusCounts['riesgo-aceptado'] || 0)) },
+                    { label: 'Prioridad Alta', value: priorityCounts.high || 0 },
+                    { label: 'Prom. Resolución', value: avgResolutionText },
+                    { label: 'Cliente Principal', value: mostAffectedCustomer }
+                ];
+                const cardWidth = (pageWidth - margin * 2 - 20 * 2) / 3;
+                const cardHeight = 60;
+                kpiMetrics.slice(0, 3).forEach((metric, index) => {
+                    const cardX = margin + index * (cardWidth + 20);
+                    doc.setFillColor(COLOR_BACKGROUND); doc.setDrawColor('#EAECEE');
+                    doc.roundedRect(cardX, yPos, cardWidth, cardHeight, 5, 5, 'FD');
+                    doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.setTextColor(COLOR_TEXT_DARK); doc.text(String(metric.value), cardX + cardWidth/2, yPos + 30, {align:'center'});
+                    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(COLOR_TEXT_LIGHT); doc.text(metric.label, cardX + cardWidth/2, yPos + 45, {align:'center'});
+                });
+                yPos += cardHeight + 20;
+                kpiMetrics.slice(3, 5).forEach((metric, index) => {
+                    const cardX = margin + (index + 0.5) * (cardWidth + 20); // Center remaining 2 cards
+                    doc.setFillColor(COLOR_BACKGROUND); doc.setDrawColor('#EAECEE');
+                    doc.roundedRect(cardX, yPos, cardWidth, cardHeight, 5, 5, 'FD');
+                    doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.setTextColor(COLOR_TEXT_DARK); doc.text(String(metric.value), cardX + cardWidth/2, yPos + 30, {align:'center'});
+                    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(COLOR_TEXT_LIGHT); doc.text(metric.label, cardX + cardWidth/2, yPos + 45, {align:'center'});
+                });
+                yPos += cardHeight + 20;
+
+                // Gráfico y Análisis
+                checkAndAddPage(200);
+                doc.addImage(chartImage, 'PNG', margin, yPos, 180, 180);
+                doc.setFontSize(FONT_H3); doc.setFont('helvetica', 'bold'); doc.setTextColor(COLOR_PRIMARY);
+                doc.text('Análisis Rápido', margin + 220, yPos + 10);
+                doc.setFontSize(FONT_NORMAL); doc.setFont('helvetica', 'normal'); doc.setTextColor(COLOR_TEXT_DARK);
+                const analysisText = `El análisis de los ${tickets.length} tickets en el período y con los filtros aplicados muestra que un ${tickets.length > 0 ? ((statusCounts.resuelto || 0) / tickets.length * 100).toFixed(1) : '0.0'}% fueron resueltos. Los tickets de prioridad alta (${priorityCounts.high || 0}) representan un foco de atención clave.`;
+                doc.text(doc.splitTextToSize(analysisText, pageWidth - (margin * 2) - 220), margin + 220, yPos + 30);
+                yPos += 200;
+
+                // Tabla resumen y Detalles
+                addSectionTitle('Listado de Tickets');
+                doc.autoTable({ ...autoTableStyles, startY: yPos, head: [['ID', 'Título', 'Estado', 'Prioridad', 'Creado el']], body: tickets.map(t => [t.id, t.title, t.status, t.priority, new Date(t.createdAt).toLocaleDateString('es-ES')]) });
+                yPos = doc.lastAutoTable.finalY;
+
+                addSectionTitle('Detalle Individual de Tickets');
+                tickets.forEach(ticket => {
+                    checkAndAddPage(80);
+                    doc.setFontSize(FONT_H3); doc.setFont('helvetica', 'bold'); doc.setTextColor(COLOR_PRIMARY);
+                    doc.text(`Ticket #${ticket.id}: ${ticket.title}`, margin, yPos); yPos += 15;
+                    doc.setFontSize(FONT_NORMAL); doc.setFont('helvetica', 'normal'); doc.setTextColor(COLOR_TEXT_DARK);
+                    const descLines = doc.splitTextToSize(`Descripción: ${ticket.description}`, pageWidth - margin*2);
+                    doc.text(descLines, margin, yPos);
+                    yPos += doc.getTextDimensions(descLines).h + 5;
+                    const activityBody = ticket.activity.sort((a,b)=>a.timestamp-b.timestamp).map(log => [new Date(log.timestamp).toLocaleString('es-ES'), log.type==='comment'?'Comentario':`A "${log.status.replace('-',' ')}"`, log.type==='comment'?log.text:log.comment]);
+                    doc.autoTable({ ...autoTableStyles, theme:'grid', startY: yPos, head: [['Fecha', 'Tipo', 'Detalle']], body: activityBody, columnStyles: {2:{cellWidth:'auto'}} });
+                    yPos = doc.lastAutoTable.finalY + 20;
+                });
+                
+                addPageFooter();
+                doc.save(`reporte_riesgos_${new Date().toISOString().slice(0, 10)}.pdf`);
+
+            } catch (error) {
+                console.error("Error al generar PDF:", error);
+                alert("Ocurrió un error al generar el PDF. Revisa la consola para más detalles.");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Exportar Vista a PDF';
+            }
+        });
+
+        // SELECTORES DEL DOM para la nueva sección del digest
+        const DOM_DIGEST = {
+            digestDaysInput: document.getElementById('digestDaysInput'),
+            generateDigestBtn: document.getElementById('generate-digest-btn'),
+            digestItemsContainer: document.getElementById('digest-items-container')
+        };
+
+        let latestDigestItems = []; // Para almacenar las noticias y usarlas al crear tickets
+
+        // Función para renderizar las noticias del digest
+        const renderDigestItems = (items) => {
+            DOM_DIGEST.digestItemsContainer.innerHTML = ''; // Limpiar el contenedor
+            if (items.length === 0) {
+                DOM_DIGEST.digestItemsContainer.innerHTML = '<p class="no-articles">No se encontraron artículos en el rango de fechas especificado.</p>';
+                return;
+            }
+
+            items.forEach((item, index) => {
+                const newsCard = document.createElement('div');
+                newsCard.className = 'news-card';
+                // CORRECCIÓN AQUÍ: Usamos toLocaleString para fecha y hora
+                const pubDate = new Date(item.pubDate).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' }); 
+                const briefContent = item.brief.startsWith('[ERROR') ? `<span class="news-brief error">${item.brief}</span>` : `<span class="news-brief">${item.brief}</span>`;
+                
+                newsCard.innerHTML = `
+                    <h3><a href="${item.link}" target="_blank" rel="noopener noreferrer">${item.title}</a></h3>
+                    <div class="news-meta">Fuente: ${item.feedTitle} | Publicado: ${pubDate}</div>
+                    ${briefContent}
+                    <button class="create-ticket-from-digest-btn action-button" data-item-index="${index}">Crear Ticket de Riesgo</button>
+                `;
+                DOM_DIGEST.digestItemsContainer.appendChild(newsCard);
+            });
+        };
+
+        // MANEJADORES DE EVENTOS para el digest
+        DOM_DIGEST.generateDigestBtn.addEventListener('click', async () => {
+            const days = DOM_DIGEST.digestDaysInput.value;
+            if (!days || days <= 0) {
+                alert('Por favor, introduce un número válido de días.');
+                return;
+            }
+
+            DOM_DIGEST.generateDigestBtn.disabled = true;
+            DOM_DIGEST.generateDigestBtn.textContent = 'Generando Digest...';
+            DOM_DIGEST.digestItemsContainer.innerHTML = '<p class="no-articles">Cargando noticias y generando resúmenes con IA. Esto puede tardar unos minutos...</p>';
+            latestDigestItems = []; // Limpiar antes de una nueva carga
+
+            try {
+                const response = await fetch(`/generate-cybersecurity-digest?days=${days}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Error desconocido al generar el digest.');
+                }
+                const digestData = await response.json(); // ¡Recibimos JSON!
+                latestDigestItems = digestData; // Almacenar para futuros usos
+                renderDigestItems(digestData); // Renderizar las noticias
+                
+            } catch (error) {
+                console.error('Error al generar el digest de ciberseguridad:', error);
+                DOM_DIGEST.digestItemsContainer.innerHTML = `<p class="no-articles error-message">Error: ${error.message}</p><p class="no-articles" style="margin-top:10px;">Por favor, revisa la consola del servidor para más detalles.</p>`;
+            } finally {
+                DOM_DIGEST.generateDigestBtn.disabled = false;
+                DOM_DIGEST.generateDigestBtn.textContent = 'Generar Digest';
+            }
+        });
+
+        // Manejador para el botón "Crear Ticket de Riesgo" de cada noticia
+        DOM_DIGEST.digestItemsContainer.addEventListener('click', e => {
+            if (e.target.matches('.create-ticket-from-digest-btn')) {
+                const itemIndex = parseInt(e.target.dataset.itemIndex, 10);
+                const selectedNews = latestDigestItems[itemIndex];
+
+                if (selectedNews) {
+                    // Pre-rellenar el formulario de creación de tickets
+                    DOM.newTicketForm.querySelector('#ticketTitle').value = `Riesgo: ${selectedNews.title}`;
+                    
+                    let descriptionToFill = selectedNews.brief;
+                    if (descriptionToFill.startsWith('[ERROR')) {
+                        descriptionToFill += `\n\nEnlace original: ${selectedNews.link}`;
+                    } else {
+                        descriptionToFill += `\n\nFuente: ${selectedNews.feedTitle}\nEnlace original: ${selectedNews.link}`;
+                    }
+                    DOM.newTicketForm.querySelector('#ticketDescription').value = descriptionToFill;
+                    
+                    // Sugerir tags basados en la fuente y algunas palabras clave
+                    let suggestedTags = [selectedNews.feedTitle.replace(/\s/g, '-').toLowerCase()];
+                    if (selectedNews.title) {
+                        selectedNews.title.split(' ').forEach(word => { // Iterar sobre todas las palabras
+                            // Añadir solo palabras con más de 3 caracteres y que no sean duplicadas ni stopwords básicas
+                            const lowerWord = word.toLowerCase().replace(/[^a-z0-9]/g, ''); // Limpiar la palabra
+                            const commonWords = ['de', 'la', 'el', 'un', 'una', 'con', 'por', 'en', 'y', 'los', 'las', 'del', 'para'];
+                            if (lowerWord.length > 3 && !suggestedTags.includes(lowerWord) && !commonWords.includes(lowerWord)) {
+                                suggestedTags.push(lowerWord);
+                            }
+                        });
+                    }
+                    // Eliminar duplicados finales y unir con coma
+                    DOM.newTicketForm.querySelector('#ticketTags').value = [...new Set(suggestedTags)].join(', ');
+
+                    // Abrir el modal
+                    openModal();
+                }
+            }
+        });
+
+        // CARGA INICIAL
+        refreshUI();
+    });
+    </script>
+</body>
+</html>
