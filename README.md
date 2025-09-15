@@ -47,7 +47,7 @@ Este proyecto es una potente aplicación web diseñada para equipos de seguridad
 ## ⚙️ Instalación y Configuración
 
 1.  **Clonar el Repositorio (o crear la estructura de archivos):**
-    Asegúrate de que todos los archivos (`server.js`, `digestGenerator.js`, `ai_studio_code (32).html`, `package.json`, `README.md`) estén en la misma carpeta raíz de tu proyecto.
+    Asegúrate de que todos los archivos (`server.js`, `digestGenerator.js`, `index.html`, `package.json`, `README.md`) estén en la misma carpeta raíz de tu proyecto.
 
 2.  **Instalar Dependencias:**
     Abre tu terminal, navega hasta la carpeta de tu proyecto y ejecuta el siguiente comando para instalar todas las dependencias necesarias:
