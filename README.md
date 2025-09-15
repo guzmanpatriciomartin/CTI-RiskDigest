@@ -103,10 +103,11 @@ Este proyecto es una potente aplicación web diseñada para equipos de seguridad
     *   Podrás revisar, ajustar la información, seleccionar la prioridad y guardar el nuevo ticket de riesgo.
 
 ## 📂 Estructura del Proyecto
-
+```
 ├── server.js # Backend: Servidor Express, API para el digest de noticias.
 ├── digestGenerator.js # Lógica central para la agregación RSS, scraping y generación de briefs con IA.
-├── ai_studio_code (32).html# Frontend: Interfaz de usuario completa, estilos CSS y lógica JavaScript del cliente.
+├── index.html# Frontend: Interfaz de usuario completa, estilos CSS y lógica JavaScript del cliente.
 ├── package.json # Metadatos del proyecto y lista de dependencias de Node.js.
 ├── node_modules/ # Directorio donde npm instala las dependencias.
 └── README.md # Este archivo de descripción del proyecto.
+```
